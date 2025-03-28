@@ -5,6 +5,6 @@ files that you will have to create
    
 2) owner_labels.py
    
-3).env for twilio
+3) env for twilio
 
-4)config.py
+4) config.py
