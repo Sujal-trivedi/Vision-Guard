@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision Guard - Surveillance Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f6fa;
+            color: var(--primary-color);
+        }
+
+        .navbar {
+            background-color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--secondary-color), #2980b9);
+            color: white;
+        }
+
+        .alert-card {
+            background: linear-gradient(135deg, var(--accent-color), #c0392b);
+            color: white;
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            opacity: 0.8;
+        }
+
+        .camera-feed {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .camera-feed img {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .status-active {
+            background-color: var(--success-color);
+            box-shadow: 0 0 10px var(--success-color);
+        }
+
+        .status-inactive {
+            background-color: var(--accent-color);
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .alert-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .alert-item {
+            padding: 10px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .alert-item:last-child {
+            border-bottom: none;
+        }
+
+        .snapshot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 15px;
+        }
+
+        .snapshot-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .snapshot-item:hover {
+            transform: scale(1.05);
+        }
+
+        .snapshot-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .snapshot-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px;
+            font-size: 0.8rem;
+        }
+
+        .btn-custom {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-custom:hover {
+            background-color: #2980b9;
+            color: white;
+        }
+
+        .btn-danger-custom {
+            background-color: var(--accent-color);
+        }
+
+        .btn-danger-custom:hover {
+            background-color: #c0392b;
+        }
+
+        .modal-content {
+            border-radius: 10px;
+            border: none;
+        }
+
+        .modal-header {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .modal-title {
+            font-weight: bold;
+        }
+
+        .close {
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .stat-card {
+                margin-bottom: 15px;
+            }
+            
+            .snapshot-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                Vision Guard
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="text-white me-3">
+                    <span class="status-indicator {% if surveillance_active %}status-active{% else %}status-inactive{% endif %}"></span>
+                    {% if surveillance_active %}Active{% else %}Inactive{% endif %}
+                </span>
+                <button class="btn btn-custom" onclick="toggleSurveillance()">
+                    {% if surveillance_active %}
+                        <i class="fas fa-stop me-2"></i>Stop Surveillance
+                    {% else %}
+                        <i class="fas fa-play me-2"></i>Start Surveillance
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Stats Row -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Total Snapshots</h6>
+                                <h2 class="mt-2 mb-0">{{ stats.num_snapshots }}</h2>
+                            </div>
+                            <i class="fas fa-camera stat-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Total Alerts</h6>
+                                <h2 class="mt-2 mb-0">{{ stats.total_alerts }}</h2>
+                            </div>
+                            <i class="fas fa-bell stat-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Recent Alerts</h6>
+                                <h2 class="mt-2 mb-0">{{ stats.recent_alerts }}</h2>
+                            </div>
+                            <i class="fas fa-clock stat-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">System Uptime</h6>
+                                <h2 class="mt-2 mb-0">{{ stats.system_uptime }}</h2>
+                            </div>
+                            <i class="fas fa-server stat-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Camera Feed -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-video me-2"></i>Live Camera Feed
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="camera-feed">
+                            <img id="camera-feed" src="/latest_snapshot" alt="Camera Feed">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Alerts -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Recent Alerts
+                        </h5>
+                        <button class="btn btn-sm btn-danger-custom" onclick="clearAlerts()">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="alert-list" id="alert-list">
+                            <!-- Alerts will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Snapshots Grid -->
+        <div class="card mt-4">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-images me-2"></i>Recent Snapshots
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="snapshot-grid" id="snapshot-grid">
+                    <!-- Snapshots will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Snapshot Modal -->
+    <div class="modal fade" id="snapshotModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Snapshot Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <img id="modal-image" src="" alt="Snapshot" class="img-fluid">
+                    <div class="mt-3">
+                        <p><strong>Timestamp:</strong> <span id="modal-timestamp"></span></p>
+                        <p><strong>Size:</strong> <span id="modal-size"></span></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger-custom" onclick="deleteSnapshot()">
+                        <i class="fas fa-trash me-2"></i>Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentSnapshot = null;
+        const snapshotModal = new bootstrap.Modal(document.getElementById('snapshotModal'));
+
+        // Update camera feed
+        function updateCameraFeed() {
+            const img = document.getElementById('camera-feed');
+            img.src = '/latest_snapshot?' + new Date().getTime();
+        }
+
+        // Update alerts
+        function updateAlerts() {
+            fetch('/alerts')
+                .then(response => response.json())
+                .then(data => {
+                    const alertList = document.getElementById('alert-list');
+                    alertList.innerHTML = '';
+                    data.alerts.forEach(alert => {
+                        const alertItem = document.createElement('div');
+                        alertItem.className = 'alert-item';
+                        alertItem.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${alert.timestamp}</strong>
+                                    <p class="mb-0">${alert.message}</p>
+                                </div>
+                                ${alert.snapshot_exists ? `
+                                    <button class="btn btn-sm btn-custom" onclick="viewSnapshot('${alert.snapshot}')">
+                                        <i class="fas fa-image"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `;
+                        alertList.appendChild(alertItem);
+                    });
+                });
+        }
+
+        // Update snapshots
+        function updateSnapshots() {
+            fetch('/snapshots')
+                .then(response => response.json())
+                .then(data => {
+                    const snapshotGrid = document.getElementById('snapshot-grid');
+                    snapshotGrid.innerHTML = '';
+                    data.snapshots.forEach(snapshot => {
+                        const snapshotItem = document.createElement('div');
+                        snapshotItem.className = 'snapshot-item';
+                        snapshotItem.innerHTML = `
+                            <img src="${snapshot.path}" alt="Snapshot">
+                            <div class="snapshot-info">
+                                <div>${snapshot.timestamp}</div>
+                                <div>${snapshot.size}</div>
+                            </div>
+                        `;
+                        snapshotItem.onclick = () => viewSnapshot(snapshot.filename);
+                        snapshotGrid.appendChild(snapshotItem);
+                    });
+                });
+        }
+
+        // View snapshot in modal
+        function viewSnapshot(filename) {
+            currentSnapshot = filename;
+            const modalImage = document.getElementById('modal-image');
+            const modalTimestamp = document.getElementById('modal-timestamp');
+            const modalSize = document.getElementById('modal-size');
+            
+            fetch('/snapshots')
+                .then(response => response.json())
+                .then(data => {
+                    const snapshot = data.snapshots.find(s => s.filename === filename);
+                    if (snapshot) {
+                        modalImage.src = snapshot.path;
+                        modalTimestamp.textContent = snapshot.timestamp;
+                        modalSize.textContent = snapshot.size;
+                        snapshotModal.show();
+                    }
+                });
+        }
+
+        // Delete snapshot
+        function deleteSnapshot() {
+            if (!currentSnapshot) return;
+            
+            fetch(`/delete_snapshot/${currentSnapshot}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        snapshotModal.hide();
+                        updateSnapshots();
+                    }
+                });
+        }
+
+        // Toggle surveillance
+        function toggleSurveillance() {
+            fetch('/toggle_surveillance', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    }
+                });
+        }
+
+        // Clear alerts
+        function clearAlerts() {
+            if (confirm('Are you sure you want to clear all alerts?')) {
+                fetch('/clear_alerts')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateAlerts();
+                        }
+                    });
+            }
+        }
+
+        // Update system info
+        function updateSystemInfo() {
+            fetch('/system_info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.stats) {
+                        document.querySelector('.status-indicator').className = 
+                            `status-indicator ${data.surveillance_active ? 'status-active' : 'status-inactive'}`;
+                    }
+                });
+        }
+
+        // Initialize
+        updateCameraFeed();
+        updateAlerts();
+        updateSnapshots();
+        updateSystemInfo();
+
+        // Set up periodic updates
+        setInterval(updateCameraFeed, 1000);
+        setInterval(updateAlerts, 5000);
+        setInterval(updateSnapshots, 10000);
+        setInterval(updateSystemInfo, 5000);
+    </script>
+</body>
+</html> 
